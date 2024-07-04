@@ -389,6 +389,16 @@ pub struct Solution<'a> {
     pub constraint_multipliers: &'a [Number],
 }
 
+fn safe_slice_from_raw_parts(data: *mut f64, len: usize) -> &'static [f64] {
+    if data.is_null() {
+        &[]
+    } else if len == 0 {
+        &[]
+    } else {
+        unsafe { slice::from_raw_parts(data, len) }
+    }
+}
+
 impl<'a> Solution<'a> {
     /// Construct the solution from raw arrays returned from the Ipopt C interface.
     fn from_raw(
@@ -397,14 +407,10 @@ impl<'a> Solution<'a> {
         num_dual_vars: usize,
     ) -> Solution<'a> {
         Solution {
-            primal_variables: unsafe { slice::from_raw_parts(data.x, num_primal_vars) },
-            lower_bound_multipliers: unsafe {
-                slice::from_raw_parts(data.mult_x_L, num_primal_vars)
-            },
-            upper_bound_multipliers: unsafe {
-                slice::from_raw_parts(data.mult_x_U, num_primal_vars)
-            },
-            constraint_multipliers: unsafe { slice::from_raw_parts(data.mult_g, num_dual_vars) },
+            primal_variables: safe_slice_from_raw_parts(data.x, num_primal_vars),
+            lower_bound_multipliers: safe_slice_from_raw_parts(data.mult_x_L, num_primal_vars),
+            upper_bound_multipliers: safe_slice_from_raw_parts(data.mult_x_U, num_primal_vars),
+            constraint_multipliers: safe_slice_from_raw_parts(data.mult_g, num_dual_vars),
         }
     }
 }
@@ -703,7 +709,7 @@ impl<P: BasicProblem> Ipopt<P> {
                 problem,
                 solution: Solution::from_raw(res.data, num_primal_variables, num_dual_variables),
             },
-            constraint_values: unsafe { slice::from_raw_parts(res.g, num_dual_variables) },
+            constraint_values: safe_slice_from_raw_parts(res.g as *mut _, num_dual_variables),
             objective_value: res.obj_val,
             status: SolveStatus::new(res.status),
         }
